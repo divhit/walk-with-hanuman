@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { HeroScene, SCENES, SCENE_TITLES } from "./scenes.jsx";
 import { HanumanOrb } from "./HanumanOrb.jsx";
 import { useHanuman } from "./useHanuman.js";
 
-const previewScene = new URLSearchParams(window.location.search).get("preview");
+const World3D = lazy(() => import("./World3D.jsx"));
+
+const params = new URLSearchParams(window.location.search);
+const previewScene = params.get("preview");
+const worldMode = params.has("world");
 
 export default function App() {
   const [phase, setPhase] = useState(previewScene ? "story" : "landing"); // landing | igniting | story | ended
@@ -49,6 +53,14 @@ export default function App() {
     setPhase("landing");
   };
 
+  if (worldMode) {
+    return (
+      <Suspense fallback={<div className="stage" />}>
+        <World3D />
+      </Suspense>
+    );
+  }
+
   if (phase === "landing" || phase === "igniting") {
     return (
       <div className="stage">
@@ -82,6 +94,9 @@ export default function App() {
           <p className="mic-note">
             Uses your microphone so Hanuman can hear you. About fifteen minutes.
           </p>
+          <a className="world-link" href="?world">
+            Peek at the walkable forest (3D prototype) →
+          </a>
         </main>
       </div>
     );
