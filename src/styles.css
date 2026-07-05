@@ -53,12 +53,16 @@ button {
   overflow: hidden;
 }
 
-.scene-holder svg {
+.scene-holder svg,
+.scene-holder img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .scene-layer {
@@ -72,7 +76,8 @@ button {
   opacity: 1;
 }
 
-.scene-layer.visible svg {
+.scene-layer.visible svg,
+.scene-layer.visible img {
   animation: kenburns 46s ease-in-out infinite alternate;
   transform-origin: 50% 62%;
 }
@@ -538,6 +543,7 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .scene-layer.visible svg,
+  .scene-layer.visible img,
   .ff,
   .diya .halo,
   .diya .core,

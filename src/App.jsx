@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { HeroScene, SCENES, SCENE_TITLES } from "./scenes.jsx";
+import { SCENE_TITLES } from "./scenes.jsx";
 import { HanumanOrb } from "./HanumanOrb.jsx";
 import { useHanuman } from "./useHanuman.js";
 
@@ -9,15 +9,32 @@ const params = new URLSearchParams(window.location.search);
 const previewScene = params.get("preview");
 const worldMode = params.has("world");
 
+const sceneSrc = (id) => `/scenes/${id}.jpg`;
+
+function SceneImage({ id, visible }) {
+  return (
+    <div className={`scene-layer ${visible ? "visible" : ""}`}>
+      <img src={sceneSrc(id)} alt={SCENE_TITLES[id] || ""} draggable="false" />
+    </div>
+  );
+}
+
+function preloadScenes() {
+  Object.keys(SCENE_TITLES).forEach((id) => {
+    const img = new Image();
+    img.src = sceneSrc(id);
+  });
+}
+
 export default function App() {
   const [phase, setPhase] = useState(previewScene ? "story" : "landing"); // landing | igniting | story | ended
   const [sceneId, setSceneId] = useState(
-    SCENES[previewScene] ? previewScene : "panchavati",
+    SCENE_TITLES[previewScene] ? previewScene : "panchavati",
   );
   const [prevSceneId, setPrevSceneId] = useState(null);
 
   const onScene = useCallback((next) => {
-    if (!SCENES[next]) return;
+    if (!SCENE_TITLES[next]) return;
     setSceneId((current) => {
       if (current === next) return current;
       setPrevSceneId(current);
@@ -35,6 +52,7 @@ export default function App() {
 
   const begin = async () => {
     setPhase("igniting");
+    preloadScenes();
     const started = hanuman.start();
     setTimeout(() => {
       setPhase((p) => (p === "igniting" ? "story" : p));
@@ -66,7 +84,11 @@ export default function App() {
       <div className="stage">
         <div className="scene-holder">
           <div className="scene-layer visible">
-            <HeroScene />
+            <img
+              src="/scenes/hero.jpg"
+              alt="Hanuman leaps across a golden moon"
+              draggable="false"
+            />
           </div>
         </div>
         <div className={`ignite-veil ${phase === "igniting" ? "on" : ""}`} />
@@ -107,7 +129,7 @@ export default function App() {
       <div className="stage">
         <div className="scene-holder">
           <div className="scene-layer visible">
-            <HeroScene />
+            <img src="/scenes/hero.jpg" alt="" draggable="false" />
           </div>
         </div>
         <main className="ended">
@@ -124,20 +146,13 @@ export default function App() {
     );
   }
 
-  const ActiveScene = SCENES[sceneId];
-  const PrevScene = prevSceneId ? SCENES[prevSceneId] : null;
-
   return (
     <div className="stage">
       <div className="scene-holder">
-        {PrevScene && (
-          <div className="scene-layer" key={`prev-${prevSceneId}`}>
-            <PrevScene />
-          </div>
+        {prevSceneId && (
+          <SceneImage id={prevSceneId} key={`prev-${prevSceneId}`} />
         )}
-        <div className="scene-layer visible" key={sceneId}>
-          <ActiveScene />
-        </div>
+        <SceneImage id={sceneId} visible key={sceneId} />
       </div>
 
       <header className="story-top">
