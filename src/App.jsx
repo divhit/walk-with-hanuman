@@ -1,5 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { SCENE_TITLES } from "./scenes.jsx";
+import {
+  CHAPTERS,
+  CHAPTER_BY_KEY,
+  ALL_SCENE_TITLES,
+  completedChapters,
+  markChapterDone,
+} from "./chapters.js";
 import { HanumanOrb } from "./HanumanOrb.jsx";
 import { useHanuman } from "./useHanuman.js";
 
@@ -14,27 +20,44 @@ const sceneSrc = (id) => `/scenes/${id}.jpg`;
 function SceneImage({ id, visible }) {
   return (
     <div className={`scene-layer ${visible ? "visible" : ""}`}>
-      <img src={sceneSrc(id)} alt={SCENE_TITLES[id] || ""} draggable="false" />
+      <img
+        src={sceneSrc(id)}
+        alt={ALL_SCENE_TITLES[id] || ""}
+        draggable="false"
+      />
     </div>
   );
 }
 
-function preloadScenes() {
-  Object.keys(SCENE_TITLES).forEach((id) => {
+function preloadChapter(chapter) {
+  Object.keys(chapter.scenes).forEach((id) => {
     const img = new Image();
     img.src = sceneSrc(id);
   });
 }
 
+function chapterOfScene(sceneId) {
+  return CHAPTERS.find((c) => c.scenes[sceneId]);
+}
+
 export default function App() {
-  const [phase, setPhase] = useState(previewScene ? "story" : "landing"); // landing | igniting | story | ended
+  // phases: landing | chapters | igniting | story | ended
+  const [phase, setPhase] = useState(previewScene ? "story" : "landing");
+  const [chapterKey, setChapterKey] = useState(
+    previewScene
+      ? (chapterOfScene(previewScene)?.key ?? "golden_deer")
+      : "princes",
+  );
   const [sceneId, setSceneId] = useState(
-    SCENE_TITLES[previewScene] ? previewScene : "panchavati",
+    ALL_SCENE_TITLES[previewScene] ? previewScene : "c1_ayodhya",
   );
   const [prevSceneId, setPrevSceneId] = useState(null);
+  const [done, setDone] = useState(completedChapters);
+
+  const chapter = CHAPTER_BY_KEY[chapterKey];
 
   const onScene = useCallback((next) => {
-    if (!SCENE_TITLES[next]) return;
+    if (!ALL_SCENE_TITLES[next]) return;
     setSceneId((current) => {
       if (current === next) return current;
       setPrevSceneId(current);
@@ -46,14 +69,25 @@ export default function App() {
   const { status } = hanuman;
 
   useEffect(() => {
-    if (phase === "story" && status === "ended") setPhase("ended");
-    if (phase === "igniting" && status === "error") setPhase("landing");
-  }, [phase, status]);
+    if (phase === "story" && status === "ended") {
+      markChapterDone(chapterKey);
+      setDone(completedChapters());
+      setPhase("ended");
+    }
+    if (phase === "igniting" && status === "error") setPhase("chapters");
+  }, [phase, status, chapterKey]);
 
-  const begin = async () => {
+  const beginChapter = async (key) => {
+    const ch = CHAPTER_BY_KEY[key];
+    setChapterKey(key);
+    setSceneId(Object.keys(ch.scenes)[0]);
+    setPrevSceneId(null);
     setPhase("igniting");
-    preloadScenes();
-    const started = hanuman.start();
+    preloadChapter(ch);
+    const started = hanuman.start({
+      chapter_num: String(ch.num),
+      chapter_title: ch.title,
+    });
     setTimeout(() => {
       setPhase((p) => (p === "igniting" ? "story" : p));
     }, 1400);
@@ -62,13 +96,9 @@ export default function App() {
 
   const endStory = async () => {
     await hanuman.stop();
+    markChapterDone(chapterKey);
+    setDone(completedChapters());
     setPhase("ended");
-  };
-
-  const reset = () => {
-    setSceneId("panchavati");
-    setPrevSceneId(null);
-    setPhase("landing");
   };
 
   if (worldMode) {
@@ -79,7 +109,7 @@ export default function App() {
     );
   }
 
-  if (phase === "landing" || phase === "igniting") {
+  if (phase === "landing") {
     return (
       <div className="stage">
         <div className="scene-holder">
@@ -91,30 +121,20 @@ export default function App() {
             />
           </div>
         </div>
-        <div className={`ignite-veil ${phase === "igniting" ? "on" : ""}`} />
         <main className="landing">
-          <p className="eyebrow">Episode one · The golden deer</p>
+          <p className="eyebrow">The Ramayana in five chapters</p>
           <h1>Walk with Hanuman</h1>
           <p className="sub">
-            The Ramayana, told to you. Hanuman tells the story out loud, scene
-            by scene — and at every hard choice, he stops and asks what{" "}
-            <em>you</em> would do. Just talk back.
+            The Ramayana, told to you. Hanuman tells the great story out loud,
+            chapter by chapter — and at every hard choice, he stops and asks
+            what <em>you</em> would do. Just talk back.
           </p>
-          {hanuman.status === "error" && (
-            <p className="error-note">
-              The lamp would not light. Allow the microphone for this site, then
-              try again.
-            </p>
-          )}
-          <button
-            className="begin-btn"
-            onClick={begin}
-            disabled={phase === "igniting"}
-          >
-            {phase === "igniting" ? "Lighting the lamp…" : "Begin the story"}
+          <button className="begin-btn" onClick={() => setPhase("chapters")}>
+            Choose a chapter
           </button>
           <p className="mic-note">
-            Uses your microphone so Hanuman can hear you. About fifteen minutes.
+            Uses your microphone so Hanuman can hear you. About fifteen minutes
+            a chapter.
           </p>
           <a className="world-link" href="?world">
             Peek at the walkable forest (3D prototype) →
@@ -124,7 +144,54 @@ export default function App() {
     );
   }
 
+  if (phase === "chapters" || phase === "igniting") {
+    return (
+      <div className="stage chapters-stage">
+        <header className="chapters-head">
+          <p className="eyebrow">The journey so far</p>
+          <h2>Five chapters. One great story.</h2>
+        </header>
+        <div className="chapter-grid">
+          {CHAPTERS.map((ch) => {
+            const isDone = done.includes(ch.key);
+            const igniting = phase === "igniting" && chapterKey === ch.key;
+            return (
+              <button
+                key={ch.key}
+                className={`chapter-card ${isDone ? "done" : ""}`}
+                onClick={() => phase === "chapters" && beginChapter(ch.key)}
+                disabled={phase === "igniting"}
+              >
+                <img src={sceneSrc(ch.card)} alt="" draggable="false" />
+                <span className="chapter-overlay" />
+                <span className="chapter-meta">
+                  <span className="chapter-num">
+                    Chapter {ch.num}
+                    {isDone && <span className="chapter-done"> · ✦ heard</span>}
+                  </span>
+                  <span className="chapter-title">{ch.title}</span>
+                  <span className="chapter-tag">{ch.tagline}</span>
+                  <span className="chapter-cta">
+                    {igniting ? "Lighting the lamp…" : "Begin →"}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {hanuman.status === "error" && (
+          <p className="error-note center">
+            The lamp would not light. Allow the microphone for this site, then
+            try again.
+          </p>
+        )}
+        <div className={`ignite-veil ${phase === "igniting" ? "on" : ""}`} />
+      </div>
+    );
+  }
+
   if (phase === "ended") {
+    const next = CHAPTERS.find((c) => !done.includes(c.key));
     return (
       <div className="stage">
         <div className="scene-holder">
@@ -135,11 +202,12 @@ export default function App() {
         <main className="ended">
           <h2>The lamp rests.</h2>
           <p>
-            Rama's search has only begun — and a certain monkey with a very long
-            tail is waiting in the next episode. Come back soon.
+            {next
+              ? `${done.length} of five chapters heard. Next on the journey: Chapter ${next.num} — ${next.title}.`
+              : "You have walked the whole journey, from Ayodhya to the first Diwali. Hanuman will happily tell any chapter again."}
           </p>
-          <button className="begin-btn" onClick={reset}>
-            Return to the beginning
+          <button className="begin-btn" onClick={() => setPhase("chapters")}>
+            {next ? "Choose the next chapter" : "Hear a chapter again"}
           </button>
         </main>
       </div>
@@ -156,7 +224,10 @@ export default function App() {
       </div>
 
       <header className="story-top">
-        <p className="story-title">{SCENE_TITLES[sceneId]}</p>
+        <p className="story-title">
+          {chapter ? `Ch. ${chapter.num} · ` : ""}
+          {ALL_SCENE_TITLES[sceneId]}
+        </p>
         <div className="story-controls">
           <button
             className="icon-btn"

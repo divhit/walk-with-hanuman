@@ -13,7 +13,7 @@ export function useHanuman({ onScene }) {
   const onSceneRef = useRef(onScene);
   onSceneRef.current = onScene;
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (dynamicVariables = {}) => {
     if (convRef.current) return;
     setStatus("connecting");
     setAgentText("");
@@ -22,6 +22,7 @@ export function useHanuman({ onScene }) {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       const options = {
         agentId: AGENT_ID,
+        dynamicVariables,
         clientTools: {
           show_scene: async ({ scene_id }) => {
             onSceneRef.current?.(scene_id);
