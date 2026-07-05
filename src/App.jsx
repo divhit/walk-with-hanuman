@@ -15,6 +15,7 @@ import {
   chapterProgress,
   saveProgress,
 } from "./chapters.js";
+import { CHAPTER_SCRIPTS } from "./chapterScripts.js";
 import { HanumanOrb } from "./HanumanOrb.jsx";
 import { useHanuman } from "./useHanuman.js";
 
@@ -109,6 +110,7 @@ export default function App() {
       chapter_num: String(ch.num),
       chapter_title: ch.title,
       start_scene_id: start === ids[0] ? "first" : start,
+      chapter_script: CHAPTER_SCRIPTS[key],
     });
     setTimeout(() => {
       setPhase((p) => (p === "igniting" ? "story" : p));
