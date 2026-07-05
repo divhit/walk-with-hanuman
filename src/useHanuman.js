@@ -84,5 +84,23 @@ export function useHanuman({ onScene }) {
     });
   }, []);
 
-  return { start, stop, toggleMute, muted, status, mode, agentText, userText };
+  const sendContext = useCallback((text) => {
+    try {
+      convRef.current?.sendContextualUpdate(text);
+    } catch {
+      /* not connected */
+    }
+  }, []);
+
+  return {
+    start,
+    stop,
+    toggleMute,
+    sendContext,
+    muted,
+    status,
+    mode,
+    agentText,
+    userText,
+  };
 }

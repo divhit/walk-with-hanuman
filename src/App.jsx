@@ -1,10 +1,19 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   CHAPTERS,
   CHAPTER_BY_KEY,
   ALL_SCENE_TITLES,
   completedChapters,
   markChapterDone,
+  chapterProgress,
+  saveProgress,
 } from "./chapters.js";
 import { HanumanOrb } from "./HanumanOrb.jsx";
 import { useHanuman } from "./useHanuman.js";
@@ -46,18 +55,23 @@ export default function App() {
   const [chapterKey, setChapterKey] = useState(
     previewScene
       ? (chapterOfScene(previewScene)?.key ?? "golden_deer")
-      : "princes",
+      : "birth",
   );
   const [sceneId, setSceneId] = useState(
-    ALL_SCENE_TITLES[previewScene] ? previewScene : "c1_ayodhya",
+    ALL_SCENE_TITLES[previewScene] ? previewScene : "n1_ravana_boon",
   );
   const [prevSceneId, setPrevSceneId] = useState(null);
   const [done, setDone] = useState(completedChapters);
+  const chapterKeyRef = useRef(chapterKey);
+  chapterKeyRef.current = chapterKey;
 
   const chapter = CHAPTER_BY_KEY[chapterKey];
+  const sceneIds = chapter ? Object.keys(chapter.scenes) : [];
+  const sceneIndex = sceneIds.indexOf(sceneId);
 
   const onScene = useCallback((next) => {
     if (!ALL_SCENE_TITLES[next]) return;
+    saveProgress(chapterKeyRef.current, next);
     setSceneId((current) => {
       if (current === next) return current;
       setPrevSceneId(current);
@@ -70,23 +84,26 @@ export default function App() {
 
   useEffect(() => {
     if (phase === "story" && status === "ended") {
-      markChapterDone(chapterKey);
       setDone(completedChapters());
       setPhase("ended");
     }
     if (phase === "igniting" && status === "error") setPhase("chapters");
-  }, [phase, status, chapterKey]);
+  }, [phase, status]);
 
-  const beginChapter = async (key) => {
+  const beginChapter = async (key, startSceneId = null) => {
     const ch = CHAPTER_BY_KEY[key];
+    const ids = Object.keys(ch.scenes);
+    const start =
+      startSceneId && ids.includes(startSceneId) ? startSceneId : ids[0];
     setChapterKey(key);
-    setSceneId(Object.keys(ch.scenes)[0]);
+    setSceneId(start);
     setPrevSceneId(null);
     setPhase("igniting");
     preloadChapter(ch);
     const started = hanuman.start({
       chapter_num: String(ch.num),
       chapter_title: ch.title,
+      start_scene_id: start === ids[0] ? "first" : start,
     });
     setTimeout(() => {
       setPhase((p) => (p === "igniting" ? "story" : p));
@@ -94,9 +111,19 @@ export default function App() {
     await started;
   };
 
-  const endStory = async () => {
+  const turnPage = (dir) => {
+    const next = sceneIds[sceneIndex + dir];
+    if (!next) return;
+    onScene(next);
+    hanuman.sendContext(
+      `(The reader turned the picture book to the scene "${ALL_SCENE_TITLES[next]}" (scene id ${next}). Continue the story from that scene onward, calling show_scene for later scenes as usual.)`,
+    );
+  };
+
+  const finishChapter = async () => {
+    // Reaching the final scene counts as hearing the chapter through.
+    if (sceneIndex === sceneIds.length - 1) markChapterDone(chapterKey);
     await hanuman.stop();
-    markChapterDone(chapterKey);
     setDone(completedChapters());
     setPhase("ended");
   };
@@ -122,10 +149,10 @@ export default function App() {
           </div>
         </div>
         <main className="landing">
-          <p className="eyebrow">The Ramayana in five chapters</p>
+          <p className="eyebrow">The complete Ramayana · fourteen chapters</p>
           <h1>Walk with Hanuman</h1>
           <p className="sub">
-            The Ramayana, told to you. Hanuman tells the great story out loud,
+            The Ramayana, told to you. Hanuman tells the whole epic out loud,
             chapter by chapter — and at every hard choice, he stops and asks
             what <em>you</em> would do. Just talk back.
           </p>
@@ -145,22 +172,31 @@ export default function App() {
   }
 
   if (phase === "chapters" || phase === "igniting") {
+    const progress = chapterProgress();
     return (
       <div className="stage chapters-stage">
         <header className="chapters-head">
           <p className="eyebrow">The journey so far</p>
-          <h2>Five chapters. One great story.</h2>
+          <h2>Fourteen chapters. One great story.</h2>
         </header>
         <div className="chapter-grid">
           {CHAPTERS.map((ch) => {
             const isDone = done.includes(ch.key);
             const igniting = phase === "igniting" && chapterKey === ch.key;
+            const resumeScene = !isDone ? progress[ch.key] : null;
+            const canResume =
+              resumeScene && Object.keys(ch.scenes).indexOf(resumeScene) > 0;
             return (
-              <button
+              <div
                 key={ch.key}
                 className={`chapter-card ${isDone ? "done" : ""}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => phase === "chapters" && beginChapter(ch.key)}
-                disabled={phase === "igniting"}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && phase === "chapters")
+                    beginChapter(ch.key);
+                }}
               >
                 <img src={sceneSrc(ch.card)} alt="" draggable="false" />
                 <span className="chapter-overlay" />
@@ -171,11 +207,25 @@ export default function App() {
                   </span>
                   <span className="chapter-title">{ch.title}</span>
                   <span className="chapter-tag">{ch.tagline}</span>
-                  <span className="chapter-cta">
-                    {igniting ? "Lighting the lamp…" : "Begin →"}
+                  <span className="chapter-actions">
+                    <span className="chapter-cta">
+                      {igniting ? "Lighting the lamp…" : "Begin →"}
+                    </span>
+                    {canResume && !igniting && (
+                      <button
+                        className="resume-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (phase === "chapters")
+                            beginChapter(ch.key, resumeScene);
+                        }}
+                      >
+                        Continue from “{ch.scenes[resumeScene]}”
+                      </button>
+                    )}
                   </span>
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -203,7 +253,7 @@ export default function App() {
           <h2>The lamp rests.</h2>
           <p>
             {next
-              ? `${done.length} of five chapters heard. Next on the journey: Chapter ${next.num} — ${next.title}.`
+              ? `${done.length} of fourteen chapters heard. Next on the journey: Chapter ${next.num} — ${next.title}.`
               : "You have walked the whole journey, from Ayodhya to the first Diwali. Hanuman will happily tell any chapter again."}
           </p>
           <button className="begin-btn" onClick={() => setPhase("chapters")}>
@@ -237,11 +287,35 @@ export default function App() {
           >
             {hanuman.muted ? "🔇" : "🔊"}
           </button>
-          <button className="end-btn" onClick={endStory}>
+          <button className="end-btn" onClick={finishChapter}>
             End the story
           </button>
         </div>
       </header>
+
+      <div className="page-nav">
+        <button
+          className="icon-btn page-btn"
+          onClick={() => turnPage(-1)}
+          disabled={sceneIndex <= 0}
+          aria-label="Previous scene"
+          title="Previous scene"
+        >
+          ‹
+        </button>
+        <span className="page-count">
+          {sceneIndex + 1} / {sceneIds.length}
+        </span>
+        <button
+          className="icon-btn page-btn"
+          onClick={() => turnPage(1)}
+          disabled={sceneIndex >= sceneIds.length - 1}
+          aria-label="Next scene"
+          title="Next scene"
+        >
+          ›
+        </button>
+      </div>
 
       <div className="convo-bar">
         <HanumanOrb status={hanuman.status} mode={hanuman.mode} />
