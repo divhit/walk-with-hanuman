@@ -1,0 +1,12 @@
+{
+    "agents": [
+        {
+            "name": "Hanuman",
+            "environments": {
+                "prod": {
+                    "config": "agent_configs/prod/hanuman.json"
+                }
+            }
+        }
+    ]
+}

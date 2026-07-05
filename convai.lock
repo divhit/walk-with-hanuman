@@ -1,0 +1,11 @@
+{
+    "agents": {
+        "Hanuman": {
+            "prod": {
+                "id": "agent_6201kwre0xe5egb87xwvwdmve5tp",
+                "hash": "39f13aaa720ea3b8c353438a70c89fa8"
+            }
+        }
+    },
+    "tools": {}
+}
