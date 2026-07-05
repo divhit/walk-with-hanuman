@@ -13,7 +13,9 @@ plus Jatayu's courage and Rama's vow.
 
 - Vite + React, plain CSS (Rozha One + Baloo 2 via Fontsource)
 - `@elevenlabs/client` — WebRTC conversation with the Hanuman agent
-- Scenes are hand-built SVG silhouette tableaux (`src/scenes.jsx`)
+- Scene art: painted storybook images in `public/scenes/` generated with
+  gemini-3-pro-image (`scripts/generate-scenes.py`, hero image as style anchor);
+  SVG tableaux in `src/scenes.jsx` back the 3D world billboards
 - The agent drives the picture book: a `show_scene` client tool switches scenes
 
 ## ElevenLabs agent
