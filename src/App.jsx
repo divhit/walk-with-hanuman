@@ -62,6 +62,10 @@ export default function App() {
   );
   const [prevSceneId, setPrevSceneId] = useState(null);
   const [done, setDone] = useState(completedChapters);
+  const [listenMode, setListenMode] = useState(
+    () => localStorage.getItem("wwh_listen_mode") || "open",
+  );
+  const [holding, setHolding] = useState(false);
   const chapterKeyRef = useRef(chapterKey);
   chapterKeyRef.current = chapterKey;
 
@@ -100,6 +104,7 @@ export default function App() {
     setPrevSceneId(null);
     setPhase("igniting");
     preloadChapter(ch);
+    hanuman.setMicMuted(listenMode === "hold");
     const started = hanuman.start({
       chapter_num: String(ch.num),
       chapter_title: ch.title,
@@ -126,6 +131,24 @@ export default function App() {
     await hanuman.stop();
     setDone(completedChapters());
     setPhase("ended");
+  };
+
+  const toggleListenMode = () => {
+    const next = listenMode === "open" ? "hold" : "open";
+    setListenMode(next);
+    localStorage.setItem("wwh_listen_mode", next);
+    hanuman.setMicMuted(next === "hold");
+    setHolding(false);
+  };
+
+  const holdStart = () => {
+    setHolding(true);
+    hanuman.setMicMuted(false);
+  };
+
+  const holdEnd = () => {
+    setHolding(false);
+    if (listenMode === "hold") hanuman.setMicMuted(true);
   };
 
   if (worldMode) {
@@ -280,6 +303,17 @@ export default function App() {
         </p>
         <div className="story-controls">
           <button
+            className="end-btn mode-btn"
+            onClick={toggleListenMode}
+            title={
+              listenMode === "open"
+                ? "Hanuman hears everything. Switch to hold-to-talk for noisy rooms."
+                : "Hanuman only hears you while the bell is held. Switch to open mic."
+            }
+          >
+            {listenMode === "open" ? "🎙️ Mic: open" : "🔔 Mic: hold to talk"}
+          </button>
+          <button
             className="icon-btn"
             onClick={hanuman.toggleMute}
             aria-label={hanuman.muted ? "Unmute Hanuman" : "Mute Hanuman"}
@@ -319,6 +353,22 @@ export default function App() {
 
       <div className="convo-bar">
         <HanumanOrb status={hanuman.status} mode={hanuman.mode} />
+        {listenMode === "hold" && (
+          <button
+            className={`talk-bell ${holding ? "holding" : ""}`}
+            onPointerDown={holdStart}
+            onPointerUp={holdEnd}
+            onPointerLeave={holdEnd}
+            onPointerCancel={holdEnd}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="Hold to speak to Hanuman"
+          >
+            <span className="talk-bell-icon">🔔</span>
+            <span className="talk-bell-label">
+              {holding ? "Hanuman hears you!" : "Hold to speak"}
+            </span>
+          </button>
+        )}
         <div className="caption-card">
           <p className="caption-name">Hanuman</p>
           <p className="caption-text">

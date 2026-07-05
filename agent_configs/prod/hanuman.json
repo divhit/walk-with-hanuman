@@ -54,7 +54,11 @@
     },
     "turn": {
       "turn_timeout": 15,
-      "silence_end_call_timeout": 90
+      "silence_end_call_timeout": 90,
+      "turn_eagerness": "patient"
+    },
+    "vad": {
+      "background_voice_detection": true
     }
   },
   "platform_settings": {

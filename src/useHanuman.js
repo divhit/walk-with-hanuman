@@ -10,6 +10,8 @@ export function useHanuman({ onScene }) {
   const [agentText, setAgentText] = useState("");
   const [userText, setUserText] = useState("");
   const [muted, setMuted] = useState(false);
+  const [micMuted, setMicMutedState] = useState(false);
+  const micMutedRef = useRef(false);
   const onSceneRef = useRef(onScene);
   onSceneRef.current = onScene;
 
@@ -55,6 +57,7 @@ export function useHanuman({ onScene }) {
         });
       }
       setStatus("connected");
+      if (micMutedRef.current) convRef.current?.setMicMuted(true);
     } catch (err) {
       console.error("Could not start conversation", err);
       convRef.current = null;
@@ -92,11 +95,23 @@ export function useHanuman({ onScene }) {
     }
   }, []);
 
+  const setMicMuted = useCallback((isMuted) => {
+    micMutedRef.current = isMuted;
+    setMicMutedState(isMuted);
+    try {
+      convRef.current?.setMicMuted(isMuted);
+    } catch {
+      /* not connected yet — applied on connect */
+    }
+  }, []);
+
   return {
     start,
     stop,
     toggleMute,
     sendContext,
+    setMicMuted,
+    micMuted,
     muted,
     status,
     mode,
